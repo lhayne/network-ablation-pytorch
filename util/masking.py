@@ -17,8 +17,8 @@ class HookedModel(torch.nn.Module):
         self.model = model
         self.hooks = []
     
-    def forward(self,**kwargs):
-        return self.model(**kwargs)
+    def forward(self,*args,**kwargs):
+        return self.model(*args,**kwargs)
 
     def apply_hook(self,layer_name,hook):
         self.hooks.append(
