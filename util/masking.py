@@ -43,6 +43,20 @@ class OutputMaskHook:
         return output
 
 
+class GetActivationsHook:
+    """
+    Hook for retrieving activations from output of layer.
+    """
+    def __init__(self,name):
+        self.name = name
+        self.activations = []
+
+    def __call__(self,model, input, output):
+        self.activations = output.detach()
+    
+    def get_activations(self):
+        return self.activations
+
 def get_module(model, name):
     """
     Finds the named module within the given model.
