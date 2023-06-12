@@ -31,21 +31,20 @@ class ActivationModel(HookedModel):
         """
         for filename in image_list:
 
-            if os.path.isfile(os.path.join(output_location,split('\.',filename)[-2]+'.pkl')):
+            if os.path.isfile(os.path.join(output_location,split('\.|\/',filename)[-2]+'.pkl')):
                 continue
 
+            print('saving ',split('\.|\/',filename)[-2])
+
             im = Image.open(filename).convert('RGB')
-            im = transforms(im).unsqueeze(0).to('cuda')
+            im = transforms(im).unsqueeze(0).to('cuda:0')
 
             with torch.no_grad():
                 self(im)
             
-            activations = dict()
-            for layer_idx,layer in enumerate(self.layers):
-                output_activations = copy.deepcopy(self.hooks[layer_idx].get_activations())
-                activations[layer] = output_activations
+            activations = self.get_activations()
 
-            pickle.dump(activations,open(os.path.join(output_location,split('\.',filename)[-2]+'.pkl'),'wb'))
+            pickle.dump(activations,open(os.path.join(output_location,split('\.|\/',filename)[-2]+'.pkl'),'wb'))
 
 
 class GetActivationsHook:
