@@ -2,16 +2,25 @@ import torchvision
 import numpy as np
 import torch
 import timm
+import robustness
+from robustness.model_utils import make_and_restore_model
+from robustness.datasets import ImageNet
 
 
 def get_model(model_name,model_weights=None):
-    try:
-        model = torchvision.models.get_model(model_name,weights=model_weights)
-    except:
+    if model_name=='resnet50_robust':
+        ds = ImageNet('/tmp')
+        model, _ = make_and_restore_model(arch='resnet50', dataset=ds,
+                resume_path=os.path.join(data_path,'checkpoints',model_weights))
+    else:
         try:
-            model = timm.create_model(model_name,weights=model_weights)
+            model = torchvision.models.get_model(model_name,weights=model_weights)
         except:
-            raise ValueError(model_name, "not found in torchvision.models or timm.")
+            try:
+                model = timm.create_model(model_name,weights=model_weights)
+            except:
+                raise ValueError(model_name, "not found in torchvision.models or timm.")
+    
     return model
 
 

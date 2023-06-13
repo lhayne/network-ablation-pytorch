@@ -86,7 +86,10 @@ def main():
     outs = []
     for im in images:
         with torch.no_grad():
-            out = model(im.unsqueeze(0).to(args.device))
+            if args.model_name == 'resnet50_robust':
+                out = model(im.unsqueeze(0).to(args.device), with_image=False)
+            else:
+                out = model(im.unsqueeze(0).to(args.device))
             outs.append(out)
     out = torch.row_stack(outs)
     print(out.shape)
