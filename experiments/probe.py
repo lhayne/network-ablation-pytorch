@@ -1,9 +1,9 @@
-import torch
 import torchvision
 import timm
 import numpy as np
 import glob
 import os
+import torch
 from scipy.io import loadmat
 from PIL import Image
 import pickle
@@ -14,7 +14,8 @@ import sys
 sys.path.append('../src/')
 
 from masking.masked_model import MaskedModel
-from utils.model_utils import get_model, get_transforms, get_labels, get_wid_labels, top5accuracy
+from utils.model_utils import get_model, get_transforms, 
+    get_labels, get_wid_labels, top5accuracy, to_categorical, rls, acc
 
 
 def main():
@@ -53,6 +54,9 @@ def main():
     layers = [n for n,m in model.named_modules() if 
               isinstance(m,getattr(sys.modules[layer_module], layer_type))]
 
+    del model
+    gc.collect()
+
     # load images
     image_list = glob.glob(os.path.join(args.data_path,'images/*'))
     transforms = get_transforms(args.model_weights)
@@ -60,54 +64,52 @@ def main():
     # load labels
     labels = get_labels(args.data_path,image_list)
 
-    # transform images
-    images = []
-    for filename in image_list:
-        im = Image.open(filename).convert('RGB')
-        images.append(transforms(im))
-    images = torch.stack(images).to(args.device)
+    # Load activations
+    activation_matrix = {l:[] for l in layers}
+    for file in np.sort(glob.glob(os.path.join(path,'*'))):
+        print(file)
+        activations = pickle.load(open(file,'rb'))
+        for layer in layers:
+            if args.model_name in ['vit_b_16','vit_l_16']:
+                activation_matrix[layer].append(activations[layer][:,1:,:]) # Remove classification token
+            else:
+                activation_matrix[layer].append(activations[layer])
+
+    print('\n','Transform')
+
+    # Transform
+    for layer in layers:
+        activation_matrix[layer] = np.stack(activation_matrix[layer]).reshape(2500,-1)
+        print(layer,activation_matrix[layer].shape)
 
     # load clusters
     clusters = pickle.load(open(os.path.join(args.data_path,args.experiment_name,args.model_name,'clusters.pkl'),'rb'))
-    
-    # load one activation to get output shape
-    activation = pickle.load(open(os.path.join(args.data_path,'activations',args.model_name,'ILSVRC2012_val_00000011.pkl'),'rb'))
 
     losses = pd.DataFrame([],columns=['model','layer','cluster_idx','label','loss'])
 
     for layer in layers:
         for cluster_idx in np.sort(np.unique(clusters)):
-            # construct mask
-            mask = np.where(clusters==cluster_idx,1.,0.)
-
-            # vit models do not mask classification token
-            if args.model_name in ['vit_b_16','vit_l_16']:
-                mask = np.row_stack((np.ones(activation[layer].shape[-1],dtype=np.float32),mask.reshape(activation[layer].shape[1:])))
-            else:
-                mask = mask.reshape(activation[layer].shape[1:]) # reshape to same shape as non-batch dimensions
-            mask = torch.to_numpy(mask,dtype=torch.float32)
-            layer_masks = {layer:mask}
-
-            # mask model
-            masked_model = MaskedModel(model,layer_masks)
-
-            # run model
-            outs = []
-            for im in images:
-                with torch.no_grad():
-                    out = model(im.unsqueeze(0).to(args.device))
-                    outs.append(out)
-            out = torch.row_stack(outs)
-            print(out.shape)
+            
+            activations = activation_matrix[layer][:,np.argwhere(clusters==cluster_idx)]
 
             # calculate per class losses and save
             losses[cluster_idx] = {}
             for label in np.sort(np.unique(labels)):
-                loss = torch.nn.CrossEntropyLoss()
-                loss = loss(out[labels==label], torch.from_numpy(labels[labels==label]).to(args.device))
-                losses.loc[len(losses)] = [model_name,layer,cluster_idx,label,loss.cpu().numpy()]
+                y = np.asarray([1 if i==label else 0 for i in labels])
+                training_indices = np.random.choice(np.arange(2500),500,replace=False)
+                testing_indices = np.setdiff1d(np.arange(2500),training_indices)
+                y_one_hot = to_categorical(y,2)
+                w = rls(torch.from_numpy(activations[training_indices]).float().to(args.device),
+                        torch.from_numpy(y_one_hot[training_indices]).float().to(args.device),
+                        penalty=10)
+                regularized_decoding_accuracy = acc(
+                    torch.from_numpy(intact_activations[testing_indices]).float().to(args.device),
+                    torch.from_numpy(y_one_hot[testing_indices]).float().to(args.device),
+                    w).cpu().numpy()
+
+                losses.loc[len(losses)] = [args.model_name,layer,cluster_idx,label,regularized_decoding_accuracy]
                 
-                losses.to_csv(os.path.join(args.data_path,args.experiment_name,args.model_name,'ablation_losses.csv'))
+                losses.to_csv(os.path.join(args.data_path,args.experiment_name,args.model_name,'linear_probes.csv'))
 
 
 if __name__=="__main__":
