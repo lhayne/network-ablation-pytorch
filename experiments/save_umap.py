@@ -15,6 +15,7 @@ from robustness.datasets import ImageNet
 import gc
 import argparse
 from re import split
+import warnings
 
 import sys
 sys.path.append('../src/')
@@ -80,6 +81,9 @@ def main():
         activation_matrix[layer] = np.stack(activation_matrix[layer]).reshape(2500,-1)
         print(layer,activation_matrix[layer].shape)
 
+        if activation_matrix[layer].shape[-1] > 300000:
+            warnings.warn('Skipping layer',layer,'too many neurons')
+
         print('\n','PCA')
 
         # PCA
@@ -92,10 +96,10 @@ def main():
         activation_matrix[layer] = UMAP(low_memory=False,verbose=True).fit_transform(activation_matrix[layer].T).T
         print(layer,activation_matrix[layer].shape)
 
-    if not os.path.isdir(os.path.join(data_path,args.experiment_name,model_name)):
-        os.mkdir(os.path.join(data_path,args.experiment_name,model_name))
+    if not os.path.isdir(os.path.join(args.data_path,args.experiment_name,args.model_name)):
+        os.mkdir(os.path.join(args.data_path,args.experiment_name,args.model_name))
 
-    pickle.dump(activation_matrix,open(os.path.join(data_path,args.experiment_name,model_name,'umap.pkl'),'wb'))
+    pickle.dump(activation_matrix,open(os.path.join(args.data_path,args.experiment_name,args.model_name,'umap.pkl'),'wb'))
 
 if __name__=="__main__":
     main()
