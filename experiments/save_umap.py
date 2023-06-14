@@ -64,6 +64,7 @@ def main():
     # Load activations
     activation_matrix = {l:[] for l in layers}
     for layer in layers:
+        # Load activations
         for file in np.sort(glob.glob(os.path.join(path,'*'))):
             print(file)
             activations = pickle.load(open(file,'rb'))
@@ -73,23 +74,23 @@ def main():
             else:
                 activation_matrix[layer].append(activations[layer])
 
-            print('\n','Transform')
+        print('\n','Transform')
 
-            # Transform
-            activation_matrix[layer] = np.stack(activation_matrix[layer]).reshape(2500,-1)
-            print(layer,activation_matrix[layer].shape)
+        # Transform
+        activation_matrix[layer] = np.stack(activation_matrix[layer]).reshape(2500,-1)
+        print(layer,activation_matrix[layer].shape)
 
-            print('\n','PCA')
+        print('\n','PCA')
 
-            # PCA
-            activation_matrix[layer] = PCA(n_components=50).fit_transform(activation_matrix[layer].T).T
-            print(layer,activation_matrix[layer].shape)
+        # PCA
+        activation_matrix[layer] = PCA(n_components=50).fit_transform(activation_matrix[layer].T).T
+        print(layer,activation_matrix[layer].shape)
 
-            print('\n','UMAP')
+        print('\n','UMAP')
 
-            # UMAP
-            activation_matrix[layer] = UMAP(low_memory=False,verbose=True).fit_transform(activation_matrix[layer].T).T
-            print(layer,activation_matrix[layer].shape)
+        # UMAP
+        activation_matrix[layer] = UMAP(low_memory=False,verbose=True).fit_transform(activation_matrix[layer].T).T
+        print(layer,activation_matrix[layer].shape)
 
     if not os.path.isdir(os.path.join(data_path,args.experiment_name,model_name)):
         os.mkdir(os.path.join(data_path,args.experiment_name,model_name))
