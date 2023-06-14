@@ -64,6 +64,7 @@ def main():
 
     # Load activations
     activation_matrix = {l:[] for l in layers}
+    skip = False
     for layer in layers:
         # Load activations
         for file in np.sort(glob.glob(os.path.join(path,'*'))):
@@ -75,14 +76,21 @@ def main():
             else:
                 activation_matrix[layer].append(activations[layer])
 
+            if activation_matrix[layer][0].size > 300000:
+                warnings.warn('Skipping layer '+layer+' too many neurons: '+str(activation_matrix[layer][0].size))
+                activation_matrix[layer] = []
+                skip = True
+                break
+
+        if skip:
+            skip = False
+            continue
+
         print('\n','Transform')
 
         # Transform
         activation_matrix[layer] = np.stack(activation_matrix[layer]).reshape(2500,-1)
         print(layer,activation_matrix[layer].shape)
-
-        if activation_matrix[layer].shape[-1] > 300000:
-            warnings.warn('Skipping layer',layer,'too many neurons')
 
         print('\n','PCA')
 
