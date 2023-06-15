@@ -1,13 +1,14 @@
+import os
 import torchvision
 import numpy as np
 import torch
 import timm
-import robustness
 from robustness.model_utils import make_and_restore_model
 from robustness.datasets import ImageNet
+from scipy.io import loadmat
 
 
-def get_model(model_name,model_weights=None):
+def get_model(model_name,model_weights=None,data_path='/'):
     if model_name=='resnet50_robust':
         ds = ImageNet('/tmp')
         model, _ = make_and_restore_model(arch='resnet50', dataset=ds,
@@ -26,7 +27,7 @@ def get_model(model_name,model_weights=None):
 
 def get_transforms(model,model_weights=None):
     try:
-        transform = torchvision.models.get_weights(model_weights).transforms()
+        transform = torchvision.models.get_weight(model_weights).transforms()
     except:
         try:
             data_cfg = timm.data.resolve_data_config(model.pretrained_cfg)

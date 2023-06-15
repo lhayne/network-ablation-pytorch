@@ -1,26 +1,16 @@
 import glob
 import os
-import timm
 import numpy as np
 import pickle
-import torch
-import torchvision
 from sklearn.decomposition import PCA
 from umap import UMAP
-from hdbscan import HDBSCAN
-from umap.umap_ import nearest_neighbors
-import robustness
-from robustness.model_utils import make_and_restore_model
-from robustness.datasets import ImageNet
 import gc
 import argparse
 from re import split
 import warnings
-
 import sys
 sys.path.append('../src/')
 
-from masking.activation_model import ActivationModel
 from utils.model_utils import get_model
 
 

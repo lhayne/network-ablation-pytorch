@@ -1,19 +1,10 @@
-import glob
 import os
-import timm
 import numpy as np
 import pickle
-import torch
-import torchvision
-from sklearn.decomposition import PCA
-from umap import UMAP
 from hdbscan import HDBSCAN
-from umap.umap_ import nearest_neighbors
-import robustness
-from robustness.model_utils import make_and_restore_model
-from robustness.datasets import ImageNet
 import gc
 from re import split
+import argparse
 
 import sys
 sys.path.append('../src/')
@@ -41,10 +32,10 @@ def main():
     parser.add_argument('--data_path', help='Path to store data.')
     parser.add_argument('--experiment_name', help='Name of experiment to add to path.')
     parser.add_argument('--layer_type', help='The type of layer from which to get activations.')
+    parser.add_argument('--num_groups', type=float, default=100, help='Minimum size of cluster passed to HDBSCAN.')
     args = parser.parse_args()
 
-    path = os.path.join(args.data_path,'activations',args.model_name)
-    model = get_model(args.model_name,args.model_weights)
+    model = get_model(args.model_name,model_weights=None)
     model.eval()
     layer_module = '.'.join(split('\.',args.layer_type)[:-1])
     layer_type = split('\.',args.layer_type)[-1]
@@ -58,9 +49,12 @@ def main():
     # HDBSCAN
     clusters = {}
     for layer in layers:
-        n_neurons = activation_matrix[layer].shape[1]
-        clusters[layer] = HDBSCAN().fit_predict(activation_matrix[layer].T)
-        print(layer,len(clusters[layer]),np.unique(clusters[layer]))
+        if len(activation_matrix[layer]) == 0:
+            clusters[layer] = []
+        else:
+            n_neurons = activation_matrix[layer].shape[1]
+            clusters[layer] = HDBSCAN(min_cluster_size=int(n_neurons/(5*args.num_groups)), min_samples=1).fit_predict(activation_matrix[layer].T)
+            print(layer,'neurons',len(clusters[layer]),'clusters',len(np.unique(clusters[layer])))
 
     if not os.path.isdir(os.path.join(args.data_path,args.experiment_name,args.model_name)):
         os.mkdir(os.path.join(args.data_path,args.experiment_name,args.model_name))

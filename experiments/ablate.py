@@ -4,17 +4,17 @@ import timm
 import numpy as np
 import glob
 import os
-from scipy.io import loadmat
 from PIL import Image
 import pickle
-import gc
 from re import split
+import argparse
+import pandas as pd
 
 import sys
 sys.path.append('../src/')
 
 from masking.masked_model import MaskedModel
-from utils.model_utils import get_model, get_transforms, get_labels, get_wid_labels, top5accuracy
+from utils.model_utils import get_model, get_transforms, get_labels
 
 
 def main():
@@ -45,7 +45,7 @@ def main():
 
     torch.hub.set_dir(args.data_path)
 
-    model = get_model(args.model_name,args.model_weights)
+    model = get_model(args.model_name,('DEFAULT' if 'DEFAULT' in args.model_weights else args.model_weights))
     model.to(args.device)
     model.eval()
     layer_module = '.'.join(split('\.',args.layer_type)[:-1])
@@ -55,7 +55,7 @@ def main():
 
     # load images
     image_list = glob.glob(os.path.join(args.data_path,'images/*'))
-    transforms = get_transforms(args.model_weights)
+    transforms = get_transforms(model,args.model_weights)
 
     # load labels
     labels = get_labels(args.data_path,image_list)
@@ -76,16 +76,18 @@ def main():
     losses = pd.DataFrame([],columns=['model','layer','cluster_idx','label','loss'])
 
     for layer in layers:
-        for cluster_idx in np.sort(np.unique(clusters)):
+        if len(clusters[layer]) == 0:
+            continue
+        for cluster_idx in np.sort(np.unique(clusters[layer])):
             # construct mask
-            mask = np.where(clusters==cluster_idx,1.,0.)
+            mask = np.where(clusters[layer]==cluster_idx,1.,0.)
 
             # vit models do not mask classification token
             if args.model_name in ['vit_b_16','vit_l_16']:
-                mask = np.row_stack((np.ones(activation[layer].shape[-1],dtype=np.float32),mask.reshape(activation[layer].shape[1:])))
+                mask = np.row_stack((np.ones(activation[layer].shape[-1],dtype=np.float32),mask.reshape((-1,activation[layer].shape[-1]))))
             else:
                 mask = mask.reshape(activation[layer].shape[1:]) # reshape to same shape as non-batch dimensions
-            mask = torch.to_numpy(mask,dtype=torch.float32)
+            mask = torch.from_numpy(mask).float().to(args.device)
             layer_masks = {layer:mask}
 
             # mask model
@@ -96,19 +98,18 @@ def main():
             for im in images:
                 with torch.no_grad():
                     if args.model_name == 'resnet50_robust':
-                        out = model(im.unsqueeze(0).to(args.device), with_image=False)
+                        out = masked_model(im.unsqueeze(0).to(args.device), with_image=False)
                     else:
-                        out = model(im.unsqueeze(0).to(args.device))
+                        out = masked_model(im.unsqueeze(0).to(args.device))
                     outs.append(out)
             out = torch.row_stack(outs)
             print(out.shape)
 
             # calculate per class losses and save
-            losses[cluster_idx] = {}
             for label in np.sort(np.unique(labels)):
                 loss = torch.nn.CrossEntropyLoss()
                 loss = loss(out[labels==label], torch.from_numpy(labels[labels==label]).to(args.device))
-                losses.loc[len(losses)] = [model_name,layer,cluster_idx,label,loss.cpu().numpy()]
+                losses.loc[len(losses)] = [args.model_name,layer,cluster_idx,label,loss.cpu().numpy()]
                 
                 losses.to_csv(os.path.join(args.data_path,args.experiment_name,args.model_name,'ablation_losses.csv'))
 

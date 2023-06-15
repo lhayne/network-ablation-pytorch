@@ -1,12 +1,8 @@
-import torchvision
 import torch
 import glob
 import os
-import timm
 import sys
 sys.path.append('../src/')
-from robustness.model_utils import make_and_restore_model
-from robustness.datasets import ImageNet
 import argparse
 
 from masking.activation_model import ActivationModel
