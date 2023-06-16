@@ -5,6 +5,7 @@ from hdbscan import HDBSCAN
 import gc
 from re import split
 import argparse
+from sklearn.cluster import KMeans
 
 import sys
 sys.path.append('../src/')
@@ -32,6 +33,7 @@ def main():
     parser.add_argument('--data_path', help='Path to store data.')
     parser.add_argument('--experiment_name', help='Name of experiment to add to path.')
     parser.add_argument('--layer_type', help='The type of layer from which to get activations.')
+    parser.add_argument('--method', default='hdbscan',help='Clustering method to use.')
     parser.add_argument('--num_groups', type=float, default=100, help='Minimum size of cluster passed to HDBSCAN.')
     args = parser.parse_args()
 
@@ -53,7 +55,12 @@ def main():
             clusters[layer] = []
         else:
             n_neurons = activation_matrix[layer].shape[1]
-            clusters[layer] = HDBSCAN(min_cluster_size=int(n_neurons/(5*args.num_groups)), min_samples=1).fit_predict(activation_matrix[layer].T)
+            if args.method == 'hdbscan':
+                clusters[layer] = HDBSCAN(min_cluster_size=int(n_neurons/(5*args.num_groups)), min_samples=1).fit_predict(activation_matrix[layer].T)
+            elif args.method == 'kmeans':
+                clusters[layer] = KMeans(n_clusters=int(args.num_groups)).fit_predict(activation_matrix[layer].T)
+            else:
+                raise ValueError('No clustering method',args.method)
             print(layer,'neurons',len(clusters[layer]),'clusters',len(np.unique(clusters[layer])))
 
     if not os.path.isdir(os.path.join(args.data_path,args.experiment_name,args.model_name)):

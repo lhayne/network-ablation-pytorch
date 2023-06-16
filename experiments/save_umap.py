@@ -12,6 +12,7 @@ import sys
 sys.path.append('../src/')
 
 from utils.model_utils import get_model
+from utils.data_utils import get_wid_labels, get_classes, get_class_wids, ImageWids
 
 
 def main():
@@ -40,10 +41,12 @@ def main():
     parser.add_argument('--data_path', help='Path to store data.')
     parser.add_argument('--experiment_name', help='Name of experiment to add to path.')
     parser.add_argument('--layer_type', help='The type of layer from which to get activations.')
+    parser.add_argument('--model_weights', default=None, help='The type of layer from which to get activations.')
+    parser.add_argument('--num_classes', default=50, type=int, help='Number of classes to visualize.')
     args = parser.parse_args()
 
     path = os.path.join(args.data_path,'activations',args.model_name)
-    model = get_model(args.model_name,model_weights=None)
+    model = get_model(args.model_name,args.model_weights,args.data_path)
     model.eval()
     layer_module = '.'.join(split('\.',args.layer_type)[:-1])
     layer_type = split('\.',args.layer_type)[-1]
@@ -52,25 +55,29 @@ def main():
     del model
     gc.collect()
 
+    image_wids = ImageWids(os.path.join(args.data_path,'wid_labels.pkl'))
+
     # Load activations
     activation_matrix = {l:[] for l in layers}
     skip = False
     for layer in layers:
         # Load activations
         for file in np.sort(glob.glob(os.path.join(path,'*'))):
-            print(file)
-            activations = pickle.load(open(file,'rb'))
-            
-            if args.model_name in ['vit_b_16','vit_l_16']:
-                activation_matrix[layer].append(activations[layer][:,1:,:]) # Remove classification token
-            else:
-                activation_matrix[layer].append(activations[layer])
+            wid = image_wids[file]
+            if wid in get_class_wids()[:args.num_classes]:
+                print(file)
+                activations = pickle.load(open(file,'rb'))
+                
+                if args.model_name in ['vit_b_16','vit_l_16']:
+                    activation_matrix[layer].append(activations[layer][:,1:,:]) # Remove classification token
+                else:
+                    activation_matrix[layer].append(activations[layer])
 
-            if activation_matrix[layer][0].size > 300000:
-                warnings.warn('Skipping layer '+layer+' too many neurons: '+str(activation_matrix[layer][0].size))
-                activation_matrix[layer] = []
-                skip = True
-                break
+                if activation_matrix[layer][0].size > 300000:
+                    warnings.warn('Skipping layer '+layer+' too many neurons: '+str(activation_matrix[layer][0].size))
+                    activation_matrix[layer] = []
+                    skip = True
+                    break
 
         if skip:
             skip = False
@@ -79,7 +86,7 @@ def main():
         print('\n','Transform')
 
         # Transform
-        activation_matrix[layer] = np.stack(activation_matrix[layer]).reshape(2500,-1)
+        activation_matrix[layer] = np.stack(activation_matrix[layer]).reshape(len(activation_matrix[layer]),-1)
         print(layer,activation_matrix[layer].shape)
 
         print('\n','PCA')

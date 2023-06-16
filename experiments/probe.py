@@ -10,8 +10,8 @@ import pandas as pd
 import sys
 sys.path.append('../src/')
 
-from utils.model_utils import get_model, get_labels, to_categorical, rls, acc
-
+from utils.model_utils import get_model, to_categorical, rls, acc
+from utils.data_utils import ImageWids, get_labels, get_class_wids
 
 def main():
     """
@@ -37,6 +37,7 @@ def main():
     parser.add_argument('--experiment_name', help='Path to store data.')
     parser.add_argument('--device', help='Device on which to run model.')
     parser.add_argument('--layer_type', help='The type of layer from which to get activations.')
+    parser.add_argument('--num_classes', default=50, type=int, help='The number of image classes to include.')
     args = parser.parse_args()
 
     torch.hub.set_dir(args.data_path)
@@ -54,6 +55,12 @@ def main():
 
     # load images
     image_list = glob.glob(os.path.join(args.data_path,'images/*'))
+    print(len(image_list))
+
+    # filter images by class
+    image_wids = ImageWids(os.path.join(args.data_path,'wid_labels.pkl'))
+    image_list = [im for im in image_list if image_wids[im] in get_class_wids()[:args.num_classes]]
+    print(len(image_list))
 
     # load labels
     labels = get_labels(args.data_path,image_list)
@@ -70,14 +77,16 @@ def main():
 
         activation_matrix = []
         for file in np.sort(glob.glob(os.path.join(args.data_path,'activations',args.model_name,'*'))):
-            print(file)
-            activations = pickle.load(open(file,'rb'))
-            if args.model_name in ['vit_b_16','vit_l_16']:
-                activation_matrix.append(activations[layer][:,1:,:]) # Remove classification token
-            else:
-                activation_matrix.append(activations[layer])
+            wid = image_wids[file]
+            if wid in get_class_wids()[:args.num_classes]:
+                print(file)
+                activations = pickle.load(open(file,'rb'))
+                if args.model_name in ['vit_b_16','vit_l_16']:
+                    activation_matrix.append(activations[layer][:,1:,:]) # Remove classification token
+                else:
+                    activation_matrix.append(activations[layer])
 
-        activation_matrix = np.stack(activation_matrix).reshape(2500,-1)
+        activation_matrix = np.stack(activation_matrix).reshape(len(activation_matrix),-1)
         print(layer,activation_matrix.shape)
 
         for cluster_idx in np.sort(np.unique(clusters[layer])):
@@ -87,8 +96,8 @@ def main():
                 # calculate per class accuracies and save
                 for label in np.sort(np.unique(labels)):
                     y = np.asarray([1 if l==label else 0 for l in labels])
-                    training_indices = np.random.choice(np.arange(2500),2000,replace=False)
-                    testing_indices = np.setdiff1d(np.arange(2500),training_indices)
+                    training_indices = np.random.choice(np.arange(len(labels)),int(len(labels)*0.8),replace=False)
+                    testing_indices = np.setdiff1d(np.arange(len(labels)),training_indices)
                     y_one_hot = to_categorical(y,2)
                     print(torch.from_numpy(cluster_activations[training_indices]).shape,torch.from_numpy(y_one_hot[training_indices]).shape)
                     w = rls(torch.from_numpy(cluster_activations[training_indices]).float().to(args.device),
@@ -101,7 +110,7 @@ def main():
 
                     accuracies.loc[len(accuracies)] = [args.model_name,layer,cluster_idx,label,regularized_decoding_accuracy]
                     
-                    accuracies.to_csv(os.path.join(args.data_path,args.experiment_name,args.model_name,'linear_probes.csv'))
+                accuracies.to_csv(os.path.join(args.data_path,args.experiment_name,args.model_name,'linear_probes.csv'))
 
 
 if __name__=="__main__":

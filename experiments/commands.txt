@@ -16,6 +16,8 @@ python save_activations.py --model_name=mixer_b16_224 --data_path=/scratch/alpin
 
 python save_activations.py --model_name=mixer_l16_224 --data_path=/scratch/alpine/luha5813/ablation_data --device=cuda:0 --layer_type=timm.models.mlp_mixer.MixerBlock
 
+python save_activations.py --model_name=alexnet --model_weights=AlexNet_Weights.DEFAULT --data_path=/scratch/alpine/luha5813/ablation_data --device=cuda:0 --layer_type=torch.nn.modules.activation.ReLU
+
 
 Save UMAP
 
@@ -29,7 +31,7 @@ python save_umap.py --model_name=resnet50 --data_path=/scratch/alpine/luha5813/a
 
 python save_umap.py --model_name=resnet152 --data_path=/scratch/alpine/luha5813/ablation_data --experiment_name=pca_100_umap_default_HDBSCAN_1000 --layer_type=torchvision.models.resnet.Bottleneck
 
-python save_save_umap.py --model_name=resnet50_robust --data_path=/scratch/alpine/luha5813/ablation_data --experiment_name=pca_100_umap_default_HDBSCAN_1000 --layer_type=robustness.imagenet_models.resnet.Bottleneck
+python save_umap.py --model_name=resnet50_robust --data_path=/scratch/alpine/luha5813/ablation_data --experiment_name=pca_100_umap_default_HDBSCAN_1000 --layer_type=robustness.imagenet_models.resnet.Bottleneck
 
 python save_umap.py --model_name=mixer_b16_224 --data_path=/scratch/alpine/luha5813/ablation_data --experiment_name=pca_100_umap_default_HDBSCAN_1000 --layer_type=timm.models.mlp_mixer.MixerBlock
 
@@ -80,7 +82,7 @@ python ablate.py --model_name=vit_b_16 --model_weights=torchvision.models.ViT_B_
 
 python ablate.py --model_name=vit_l_16 --model_weights=torchvision.models.ViT_L_16_Weights.DEFAULT --data_path=/scratch/alpine/luha5813/ablation_data --experiment_name=pca_100_umap_default_HDBSCAN_1000 --device=cuda:0 --layer_type=torchvision.models.vision_transformer.EncoderBlock
 
-python save_baseablateline_loss.py --model_name=vit_medium_patch16_gap_256.sw_in12k_ft_in1k --data_path=/scratch/alpine/luha5813/ablation_data --experiment_name=pca_100_umap_default_HDBSCAN_1000 --device=cuda:0 --layer_type=timm.models.vision_transformer.Block
+python ablate.py --model_name=vit_medium_patch16_gap_256.sw_in12k_ft_in1k --data_path=/scratch/alpine/luha5813/ablation_data --experiment_name=pca_100_umap_default_HDBSCAN_1000 --device=cuda:0 --layer_type=timm.models.vision_transformer.Block
 
 python ablate.py --model_name=resnet50 --model_weights=torchvision.models.ResNet50_Weights.DEFAULT --data_path=/scratch/alpine/luha5813/ablation_data --experiment_name=pca_100_umap_default_HDBSCAN_1000 --device=cuda:0 --layer_type=torchvision.models.resnet.Bottleneck
 
