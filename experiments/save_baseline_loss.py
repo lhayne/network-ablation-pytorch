@@ -34,7 +34,7 @@ def main():
 
     parser = argparse.ArgumentParser(conflict_handler='resolve')
     parser.add_argument('--model_name', help='Model to use.')
-    parser.add_argument('--model_weights', default=None, help='Model weights to use.')
+    parser.add_argument('--model_weights', default='', help='Model weights to use.')
     parser.add_argument('--data_path', help='Path to store data.')
     parser.add_argument('--device', help='Device on which to run model.')
     args = parser.parse_args()

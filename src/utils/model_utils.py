@@ -49,6 +49,9 @@ def acc(X,Y,W):
     return torch.count_nonzero(predictions==labels)/len(predictions)
 
 
-def to_categorical(y, num_classes):
+def to_categorical(y, num_classes, binary=False):
     """ 1-hot encodes a tensor """
-    return (2*np.eye(num_classes)-1)[y]
+    if binary:
+        return (np.eye(num_classes))[y]
+    else:
+        return (2*np.eye(num_classes)-1)[y]

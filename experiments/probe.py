@@ -54,7 +54,7 @@ def main():
     gc.collect()
 
     # load images
-    image_list = glob.glob(os.path.join(args.data_path,'images/*'))
+    image_list = np.sort(glob.glob(os.path.join(args.data_path,'images/*')))
     print(len(image_list))
 
     # filter images by class
@@ -92,23 +92,28 @@ def main():
         for cluster_idx in np.sort(np.unique(clusters[layer])):
             if cluster_idx != -1 and len(clusters[layer][clusters[layer]==cluster_idx]) < 10000: 
                 cluster_activations = activation_matrix[:,np.argwhere(clusters[layer]==cluster_idx).squeeze()]
+                print('cluster_activations',cluster_activations.shape)
 
                 # calculate per class accuracies and save
                 for label in np.sort(np.unique(labels)):
                     y = np.asarray([1 if l==label else 0 for l in labels])
-                    training_indices = np.random.choice(np.arange(len(labels)),int(len(labels)*0.8),replace=False)
-                    testing_indices = np.setdiff1d(np.arange(len(labels)),training_indices)
                     y_one_hot = to_categorical(y,2)
-                    print(torch.from_numpy(cluster_activations[training_indices]).shape,torch.from_numpy(y_one_hot[training_indices]).shape)
-                    w = rls(torch.from_numpy(cluster_activations[training_indices]).float().to(args.device),
-                            torch.from_numpy(y_one_hot[training_indices]).float().to(args.device),
-                            penalty=10)
-                    regularized_decoding_accuracy = acc(
-                        torch.from_numpy(cluster_activations[testing_indices]).float().to(args.device),
-                        torch.from_numpy(y_one_hot[testing_indices]).float().to(args.device),
-                        w).cpu().numpy()
 
-                    accuracies.loc[len(accuracies)] = [args.model_name,layer,cluster_idx,label,regularized_decoding_accuracy]
+                    accs = []
+                    for _ in range(10):
+                        training_indices = np.random.choice(np.arange(len(labels)),int(len(labels)*0.8),replace=False)
+                        testing_indices = np.setdiff1d(np.arange(len(labels)),training_indices)
+                        w = rls(torch.from_numpy(cluster_activations[training_indices]).float().to(args.device),
+                                torch.from_numpy(y_one_hot[training_indices]).float().to(args.device),
+                                penalty=10)
+                        regularized_decoding_accuracy = acc(
+                            torch.from_numpy(cluster_activations[testing_indices]).float().to(args.device),
+                            torch.from_numpy(y_one_hot[testing_indices]).float().to(args.device),
+                            w).cpu().numpy()
+                        accs.append(regularized_decoding_accuracy)
+
+                    print(accs)
+                    accuracies.loc[len(accuracies)] = [args.model_name,layer,cluster_idx,label,np.mean(accs)]
                     
                 accuracies.to_csv(os.path.join(args.data_path,args.experiment_name,args.model_name,'linear_probes.csv'))
 

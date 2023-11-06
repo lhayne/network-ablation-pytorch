@@ -3,7 +3,6 @@ import os
 import numpy as np
 import pickle
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 from umap import UMAP
 import gc
 import argparse
@@ -11,9 +10,10 @@ from re import split
 import warnings
 import sys
 sys.path.append('../src/')
+from collections import Counter
 
-from utils.model_utils import get_model
-from utils.data_utils import get_wid_labels, get_classes, get_class_wids, ImageWids
+from utils.model_utils import get_model, to_categorical
+from utils.data_utils import get_wid_labels, get_classes, get_class_wids, ImageWids, get_labels
 
 
 def main():
@@ -42,12 +42,9 @@ def main():
     parser.add_argument('--data_path', help='Path to store data.')
     parser.add_argument('--experiment_name', help='Name of experiment to add to path.')
     parser.add_argument('--layer_type', help='The type of layer from which to get activations.')
-    parser.add_argument('--model_weights', default=None, help='The type of layer from which to get activations.')
-    parser.add_argument('--class_start', default=0, type=int, help='First class to visualize.')
-    parser.add_argument('--class_end', default=50, type=int, help='Last class to visualize.')
-    parser.add_argument('--n_neighbors', default=15, type=int, help='Number of neighbors to consider in UMAP.')
-    parser.add_argument('--min_dist', default=0.1, type=float, help='Minimum distance of points in UMAP.')
-    parser.add_argument('--normalize', action=argparse.BooleanOptionalAction, help='Whether to normalize the data.')
+    parser.add_argument('--model_weights', default='', help='The type of layer from which to get activations.')
+    parser.add_argument('--class_start', default=0, type=int, help='The first class to include.')
+    parser.add_argument('--class_end', default=50, type=int, help='The last class to include.')
     args = parser.parse_args()
 
     path = os.path.join(args.data_path,'activations',args.model_name)
@@ -61,16 +58,27 @@ def main():
     gc.collect()
 
     image_wids = ImageWids(os.path.join(args.data_path,'wid_labels.pkl'))
+    image_list = np.sort(glob.glob(os.path.join(args.data_path,'images/*')))
+
+    # filter images by class
+    image_list = [im for im in image_list if image_wids[im] in get_class_wids()[args.class_start:args.class_end]]
+
+    # load labels
+    labels = get_labels(args.data_path,image_list)
+    label_to_index = dict(zip(np.sort(np.unique(labels)),np.arange(10)))
+    y = [label_to_index[l] for l in labels]
+    y_one_hot = to_categorical(y,len(label_to_index),binary=True)
+    print('y',y_one_hot)
 
     # Load activations
     activation_matrix = {l:[] for l in layers}
-    skip = False
     for layer in layers:
         # Load activations
         for file in np.sort(glob.glob(os.path.join(path,'*'))):
             wid = image_wids[file]
             if wid in get_class_wids()[args.class_start:args.class_end]:
-                print(file)
+                # print(file)
+
                 activations = pickle.load(open(file,'rb'))
                 
                 if args.model_name in ['vit_b_16','vit_l_16']:
@@ -78,45 +86,22 @@ def main():
                 else:
                     activation_matrix[layer].append(activations[layer])
 
-                if activation_matrix[layer][0].size > 300000:
-                    warnings.warn('Skipping layer '+layer+' too many neurons: '+str(activation_matrix[layer][0].size))
-                    activation_matrix[layer] = []
-                    skip = True
-                    break
-
-        if skip:
-            skip = False
-            continue
-
         print('\n','Transform')
 
         # Transform
         activation_matrix[layer] = np.stack(activation_matrix[layer]).reshape(len(activation_matrix[layer]),-1)
-        print(layer,activation_matrix[layer].shape)
+        print(layer,activation_matrix[layer].shape,np.min(activation_matrix[layer]),np.max(activation_matrix[layer]))
 
-        print('\n','PCA')
+        print('\n','Selective Magnitude')
 
-        if args.normalize:
-            activation_matrix[layer] = StandardScaler().fit_transform(activation_matrix[layer].T).T
-            print('Normalized',np.mean(activation_matrix[layer]),np.std(activation_matrix[layer]))
+        # Selective magnitude
+        activation_matrix[layer] = (y_one_hot.T @ activation_matrix[layer]) / np.sum(y_one_hot,axis=0).reshape(-1,1)
+        print(layer,activation_matrix[layer].shape,np.min(activation_matrix[layer]),np.max(activation_matrix[layer]),np.sum(y_one_hot,axis=0))
 
-        # PCA
-        activation_matrix[layer] = PCA(n_components=50).fit_transform(activation_matrix[layer].T).T
-        print(layer,activation_matrix[layer].shape)
-
-        print('\n','UMAP')
-
-        # UMAP
-        activation_matrix[layer] = UMAP(low_memory=False,verbose=True,n_neighbors=args.n_neighbors,min_dist=args.min_dist).fit_transform(activation_matrix[layer].T).T
-        print(layer,activation_matrix[layer].shape)
-
-    if not os.path.isdir(os.path.join(args.data_path,args.experiment_name)):
-        os.mkdir(os.path.join(args.data_path,args.experiment_name))
-    
     if not os.path.isdir(os.path.join(args.data_path,args.experiment_name,args.model_name)):
         os.mkdir(os.path.join(args.data_path,args.experiment_name,args.model_name))
 
-    pickle.dump(activation_matrix,open(os.path.join(args.data_path,args.experiment_name,args.model_name,'umap.pkl'),'wb'))
+    pickle.dump(activation_matrix,open(os.path.join(args.data_path,args.experiment_name,args.model_name,'selective_magnitude.pkl'),'wb'))
 
 if __name__=="__main__":
     main()

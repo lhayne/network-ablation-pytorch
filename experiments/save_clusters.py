@@ -66,7 +66,7 @@ def main():
     if not os.path.isdir(os.path.join(args.data_path,args.experiment_name,args.model_name)):
         os.mkdir(os.path.join(args.data_path,args.experiment_name,args.model_name))
 
-    pickle.dump(clusters,open(os.path.join(args.data_path,args.experiment_name,args.model_name,'clusters.pkl'),'wb'))
+    pickle.dump(clusters,open(os.path.join(args.data_path,args.experiment_name,args.model_name,args.method+'_'+str(args.num_groups)+'_'+'clusters.pkl'),'wb'))
 
 
 if __name__=="__main__":

@@ -42,7 +42,10 @@ def main():
     parser.add_argument('--experiment_name', help='Path to store data.')
     parser.add_argument('--device', help='Device on which to run model.')
     parser.add_argument('--layer_type', help='The type of layer from which to get activations.')
-    parser.add_argument('--num_classes', default=50, type=int, help='The number of image classes to include.')
+    parser.add_argument('--class_start', default=0, type=int, help='The first class to include.')
+    parser.add_argument('--class_end', default=50, type=int, help='The last class to include.')
+    parser.add_argument('--cluster_method', default='kmeans', help='The clustering method to read from.')
+    parser.add_argument('--num_clusters', default=10, type=float, help='The number of clusters.')
     args = parser.parse_args()
 
     torch.hub.set_dir(args.data_path)
@@ -61,7 +64,7 @@ def main():
 
     # filter images by class
     image_wids = ImageWids(os.path.join(args.data_path,'wid_labels.pkl'))
-    image_list = [im for im in image_list if image_wids[im] in get_class_wids()[:args.num_classes]]
+    image_list = [im for im in image_list if image_wids[im] in get_class_wids()[args.class_start:args.class_end]]
 
     # load labels
     labels = get_labels(args.data_path,image_list)
@@ -74,7 +77,7 @@ def main():
     images = torch.stack(images).to(args.device)
 
     # load clusters
-    clusters = pickle.load(open(os.path.join(args.data_path,args.experiment_name,args.model_name,'clusters.pkl'),'rb'))
+    clusters = pickle.load(open(os.path.join(args.data_path,args.experiment_name,args.model_name,args.cluster_method+'_'+str(args.num_clusters)+'_'+'clusters.pkl'),'rb'))
     
     # load one activation to get output shape
     activation = pickle.load(open(os.path.join(args.data_path,'activations',args.model_name,'ILSVRC2012_val_00000011.pkl'),'rb'))
@@ -120,7 +123,7 @@ def main():
                 losses.loc[len(losses)] = [args.model_name,layer,cluster_idx,label,loss.cpu().numpy()]
                 print('loss:',loss)
                 
-            losses.to_csv(os.path.join(args.data_path,args.experiment_name,args.model_name,'ablation_losses.csv'))
+            losses.to_csv(os.path.join(args.data_path,args.experiment_name,args.model_name,args.cluster_method+'_'+str(args.num_clusters)+'_'+'ablation_losses.csv'))
 
             masked_model.remove_hooks()
             print(masked_model.hooks)

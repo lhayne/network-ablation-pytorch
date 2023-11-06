@@ -71,7 +71,7 @@ python save_baseline_loss.py --model_name=resnet152 --model_weights=torchvision.
 
 python save_baseline_loss.py --model_name=resnet50_robust --model_weights=torchvision.models.ResNet50_Weights.DEFAULT --data_path=/scratch/alpine/luha5813/ablation_data --experiment_name=pca_100_umap_default_HDBSCAN_1000 --device=cuda:0 --layer_type=robustness.imagenet_models.resnet.Bottleneck
 
-python save_baseline_loss.py --model_name=mixer_b16_224 --data_path=/scratch/alpine/luha5813/ablation_data --experiment_name=pca_100_umap_default_HDBSCAN_1000 --device=cuda:0 --layer_type=timm.models.mlp_mixer.MixerBlock
+python save_baseline_loss.py --model_name=mixer_b16_224 --data_path=/scratch/alpine/luha5813/ablation_data --device=cuda:0 --layer_type=timm.models.mlp_mixer.MixerBlock
 
 python save_baseline_loss.py --model_name=mixer_l16_224 --data_path=/scratch/alpine/luha5813/ablation_data --experiment_name=pca_100_umap_default_HDBSCAN_1000 --device=cuda:0 --layer_type=timm.models.mlp_mixer.MixerBlock
 
