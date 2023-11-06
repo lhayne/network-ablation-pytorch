@@ -1,4 +1,4 @@
-# Network Ablation Pytorch
+# Network Ablation in PyTorch
 
 ![UMAP visualizations of activations in ViT and MLP-Mixer models.](/img/umap-visualization.png)
 
